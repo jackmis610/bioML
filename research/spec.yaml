@@ -1,0 +1,317 @@
+# bioML synthetic CPET + wearable generator -- master parameter spec
+# Sources: research/physiology_priors.md, research/sensor_noise.md, research/design_decisions.md
+# Schema version: 1   |   Created: 2026-05-21
+#
+# Conventions
+#   [mean, sd]            -> truncated Gaussian
+#   {mu_log, sigma_log}   -> lognormal
+#   bounds: [lo, hi]      -> rejection-sample to range
+
+schema_version: 1
+time_resolution_s: 1
+modality: cycling_ergometer
+
+# ============================================================
+# SUBJECT-LEVEL PRIORS (one draw per simulated subject)
+# ============================================================
+subject:
+  age:
+    distribution: uniform
+    bounds: [18, 65]
+
+  sex_M_probability: 0.5
+
+  training_status:
+    distribution: categorical
+    weights:
+      untrained:    0.30
+      recreational: 0.45
+      well_trained: 0.20
+      elite:        0.05
+
+  diet_state:
+    distribution: categorical
+    weights:
+      fasted:        0.50
+      fed_carb_2_3h: 0.40
+      keto_adapted:  0.10
+
+  # VO2max at age 25; apply age decrement after
+  vo2max_mlkgmin:
+    distribution: gaussian
+    by_stratum:
+      untrained:    { M: [38, 7], F: [32, 6] }
+      recreational: { M: [50, 7], F: [42, 6] }
+      well_trained: { M: [62, 6], F: [54, 6] }
+      elite:        { M: [78, 5], F: [70, 5] }
+    age_decrement_per_year: [0.45, 0.15]   # mean, sd of subject slope
+    bounds: [20, 95]
+
+  hrmax_bpm:
+    formula: "208 - 0.7*age"          # Tanaka
+    residual_sd: 10
+    bounds: [150, 220]
+
+  hr_rest_bpm:
+    by_stratum:
+      untrained:    { M: [70, 10], F: [74, 10] }
+      recreational: { all: [60, 8] }
+      well_trained: { all: [50, 7] }
+      elite:        { all: [42, 6] }
+    bounds: [30, 100]
+
+  # Q1 RESOLVED: wider SDs (Iannetta n=1691); bivariate copula on (LT1, LT2)
+  thresholds_pct_vo2max:
+    distribution: bivariate_gaussian
+    lt1_lt2_correlation: 0.60
+    by_stratum:
+      untrained:    { lt1: [52, 8], lt2: [81, 7] }
+      recreational: { lt1: [56, 7], lt2: [85, 6] }
+      well_trained: { lt1: [62, 6], lt2: [87, 5] }
+      elite:        { lt1: [68, 5], lt2: [89, 4] }
+    constraint: "lt2 - lt1 >= 8"      # rejection-sample
+    bounds:
+      lt1: [30, 80]
+      lt2: [55, 95]
+
+  fatmax_pct_vo2max:
+    by_stratum:
+      untrained:    [48, 10]
+      recreational: { M: [51, 8], F: [50, 10] }
+      well_trained: [56, 8]
+      elite:        [60, 7]
+    bounds: [25, 80]
+
+  mfo_g_per_min:                       # max fat oxidation
+    distribution: lognormal
+    by_stratum:
+      untrained:    { mu_log: -1.20, sigma_log: 0.40 }
+      recreational: { M: { mu_log: -0.78, sigma_log: 0.30 },
+                      F: { mu_log: -1.05, sigma_log: 0.33 } }
+      well_trained: { mu_log: -0.63, sigma_log: 0.30 }
+      elite:        { mu_log: -0.43, sigma_log: 0.27 }
+    diet_multiplier_keto: 2.3
+    bounds: [0.05, 2.0]
+
+  gross_efficiency_pct:               # cycling, at moderate intensity
+    by_stratum:
+      untrained:    [19.0, 1.5]
+      recreational: [20.5, 1.5]
+      well_trained: [22.0, 1.3]
+      elite:        [23.5, 1.5]
+    intensity_slope_per_pct_vo2max: 0.015
+    bounds: [16, 27]
+
+  initial_muscle_glycogen_mmol_per_kg:
+    by_stratum:
+      untrained:    [105, 8]
+      recreational: [122, 10]
+      well_trained: [142, 10]
+      elite:        [158, 10]
+    bounds: [60, 200]
+
+  vo2_tau_moderate_s:                 # phase-II kinetics
+    by_stratum:
+      untrained:    [35, 8]
+      recreational: [25, 6]
+      well_trained: [18, 4]
+      elite:        [10, 3]
+    bounds: [5, 60]
+
+  cardiodynamic_delay_s: [18, 4]
+
+  vo2_slow_component_mlmin:           # asymptotic amplitude
+    moderate_below_lt1:   [20, 30]
+    heavy_lt1_to_lt2:     [130, 80]
+    severe_above_lt2:     [450, 170]
+    extreme_near_vo2max:  [1200, 300]
+    onset_delay_s:        [100, 30]
+    training_amplitude_multiplier:
+      well_trained: 0.65
+      elite:        0.65
+
+  hr_drift_bpm_per_min_at_65pct_vo2max:
+    by_stratum:
+      untrained:    [0.10, 0.04]
+      recreational: [0.08, 0.03]
+      well_trained: [0.06, 0.03]
+      elite:        [0.05, 0.02]
+    heat_multiplier_above_30C: 3.0
+    dehydration_multiplier_per_pct_bw_loss: 1.3
+
+  resting_rer:
+    by_diet:
+      fasted:        [0.82, 0.04]
+      fed_carb_2_3h: [0.88, 0.04]
+      keto_adapted:  [0.74, 0.03]
+    bounds: [0.70, 0.95]
+
+# ============================================================
+# Q2 RESOLVED: 3-segment piecewise-linear RER curve, anchor-point form
+# Slopes computed deterministically per-subject from anchors + sampled LT1/LT2
+# ============================================================
+rer_curve:
+  form: piecewise_linear_smoothed
+  knee_smoothing_pct_vo2max: 3        # softplus blend width at LT1 and LT2
+
+  anchor_rer:                          # [rest, fatmax, LT1, LT2, 100%] per stratum
+    untrained:    { rest: 0.82, fatmax: 0.86, lt1: 0.89, lt2: 1.00, max: 1.10 }
+    recreational: { rest: 0.82, fatmax: 0.87, lt1: 0.90, lt2: 1.00, max: 1.08 }
+    well_trained: { rest: 0.82, fatmax: 0.88, lt1: 0.91, lt2: 1.00, max: 1.06 }
+    elite:        { rest: 0.82, fatmax: 0.89, lt1: 0.92, lt2: 1.00, max: 1.05 }
+
+  sex_modifier_F:
+    rer_shift_at_matched_pct_vo2max: -0.025
+    fatmax_shift_pct_vo2max: +3
+
+  diet_modifier:
+    fed_carb_2_3h:
+      rer_shift: +0.04                 # uniform shift at all intensities
+      lt2_anchor_shift_max: -0.01      # less buffering capacity post-meal
+    keto_adapted:
+      rer_shift: -0.06
+      max_anchor_shift_max: -0.02
+      fatmax_pct_vo2max_offset: +10    # right-shift
+
+  breath_noise_sd_30s_window: 0.015
+
+# ============================================================
+# Q3 RESOLVED: biphasic-linear muscle glycogen depletion
+# ============================================================
+glycogen:
+  model: biphasic_linear
+
+  r1_at_65pct_vo2max_mmol_per_kg_per_min:
+    by_stratum:
+      untrained:    [0.45, 0.10]
+      recreational: [0.60, 0.12]
+      well_trained: [0.75, 0.10]
+      elite:        [0.85, 0.10]
+
+  intensity_scaling:
+    formula: "r1(x) = r1(65) * (x/65)^1.8"
+    valid_range_pct_vo2max: [40, 85]
+    above_85pct_vo2max: use_phase1_rate_capped
+
+  knee_fraction_of_G0:
+    untrained:    0.55
+    recreational: 0.55
+    well_trained: 0.50
+    elite:        0.50
+
+  phase2_rate_multiplier: 0.45         # r2 / r1; SD log = 0.12
+
+  noise_log_sigma: 0.12
+
+  # CHO feeding: independent blood-glucose channel (does NOT shift muscle curve)
+  cho_feeding:
+    plasma_glucose_oxidation_g_per_min_per_60_g_per_h: 0.8
+    plasma_glucose_oxidation_cap_g_per_min: 1.1
+    liver_glycogen_sparing_factor_at_60_g_per_h: 0.5
+
+# ============================================================
+# RER drift driven by glycogen state (prolonged exercise)
+# Used additively on top of intensity-based RER curve
+# ============================================================
+rer_drift:
+  # delta_RER(t) = -beta * (1 - glycogen_fraction_remaining)
+  beta_by_stratum:
+    untrained:    0.10
+    recreational: 0.09
+    well_trained: 0.08
+    elite:        0.07
+
+  cho_attenuation:
+    formula: "drift *= (1 - alpha * cho_g_per_h / 60)"
+    alpha: 0.70
+
+# ============================================================
+# Q4 RESOLVED: direct RER target with multitask LT2-flag head
+# ============================================================
+output_strategy:
+  primary_target: rer
+  auxiliary_target: above_lt2_flag
+
+  above_lt2_flag_definition:
+    or_logic:
+      - rer >= 1.00
+      - pct_vo2max > 85
+
+  losses:
+    rer: huber
+    huber_delta: 0.02
+    flag: binary_cross_entropy
+    flag_positive_class_weight: 4.0
+
+  downstream_substrate_emission:
+    apply_frayn_when_all:
+      - predicted_rer < 0.99
+      - lt2_flag_probability < 0.5
+    above_lt2_output:
+      fat_ox: null
+      cho_ox: null
+      regime: "buffering_dominated"
+
+  evaluation:
+    cv_strategy: subject_wise_kfold
+    k: 5
+    test_split: physiology_stratified  # subjects from all 4 strata in held-out
+    metrics:
+      valid_range:
+        - mae_rer
+        - mae_fat_ox_g_per_min
+        - bias_fat_ox
+        - bland_altman_loa
+        - calibration_plot_rer
+        - per_intensity_bin_mae
+      invalid_range:
+        - auc_lt2_flag
+        - calibration_brier_lt2_flag
+        - mae_rer_only
+
+# ============================================================
+# FRAYN STOICHIOMETRY (Frayn 1983; Jeukendrup-Wallis 2005)
+# VO2, VCO2 in L/min STPD; N (urinary nitrogen) = 0
+# ============================================================
+frayn:
+  resting_conditions:
+    fat_g_per_min: "1.695*VO2 - 1.701*VCO2"
+    cho_g_per_min: "4.55*VCO2 - 3.21*VO2"
+  exercise_conditions:
+    fat_g_per_min: "1.695*VO2 - 1.701*VCO2"
+    cho_g_per_min: "4.344*VCO2 - 3.061*VO2"
+  energy_kcal_per_g:
+    fat: 9.75
+    cho_glucose: 4.07
+    cho_glycogen: 4.18
+  validity:
+    rer_range: [0.71, 1.00]
+    pct_vo2max_max: 85
+    clamp_fat_at_rer_ge_1: true
+    invalidate_above_pct_vo2max: true
+
+# ============================================================
+# Session-level protocols (one draw per simulated session)
+# ============================================================
+session:
+  protocol:
+    distribution: categorical
+    weights:
+      ramp_incremental: 0.30          # standard VO2max test
+      step_incremental: 0.20          # 3-min stages for substrate testing
+      steady_state_submax: 0.25       # 30-90 min at fixed intensity
+      long_endurance: 0.15            # 90-180 min, fueling dynamics
+      intervals: 0.10                 # HIIT, mixed intensity
+  duration_minutes:
+    ramp_incremental:    [12, 3]
+    step_incremental:    [25, 5]
+    steady_state_submax: [60, 20]
+    long_endurance:      [120, 40]
+    intervals:           [45, 15]
+
+# ============================================================
+# Reference: sensor observation layer
+# Full sensor-noise spec in research/sensor_noise.md
+# ============================================================
+sensors:
+  reference: research/sensor_noise.md

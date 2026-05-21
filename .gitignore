@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Build
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Data (regenerable)
+data/synthetic/
+data/aevox/
+data/public/
+!data/.gitkeep
+
+# Models / experiments
+mlruns/
+models/
+*.ckpt
+*.joblib
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Env
+.env
