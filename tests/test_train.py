@@ -13,7 +13,6 @@ from bioml.eval.metrics import evaluate_multitask
 from bioml.eval.splits import subject_kfold
 from bioml.generator.run import generate_dataset
 from bioml.train import cross_validate, fit_multitask
-from bioml.train import _pct_vo2max_from_features_and_truth
 
 
 @pytest.fixture(scope="module")
@@ -53,12 +52,8 @@ def test_lightgbm_beats_population_curve_baseline(dataset_path: Path) -> None:
     lgb_mae = []
     pop_mae = []
     for train_ids, val_ids in splits:
-        train_td = build_training_data(
-            ds.samples, ds.subjects, ds.sessions, subject_ids=train_ids
-        )
-        val_td = build_training_data(
-            ds.samples, ds.subjects, ds.sessions, subject_ids=val_ids
-        )
+        train_td = build_training_data(ds.samples, ds.subjects, ds.sessions, subject_ids=train_ids)
+        val_td = build_training_data(ds.samples, ds.subjects, ds.sessions, subject_ids=val_ids)
 
         lgb_model = fit_multitask(train_td, n_estimators=200)
         lgb_preds = lgb_model.predict(val_td.features)
@@ -69,7 +64,8 @@ def test_lightgbm_beats_population_curve_baseline(dataset_path: Path) -> None:
         rer_true = val_td.targets["rer_lab"].to_numpy()
         vo2_true = val_td.targets["vo2_lab_mlmin"].to_numpy()
         lt2_true = val_td.targets["above_lt2_flag"].to_numpy()
-        pct_true = _pct_vo2max_from_features_and_truth(val_td.features, vo2_true)
+        assert val_td.eval_cols is not None
+        pct_true = val_td.eval_cols["pct_vo2max_lab"].to_numpy()
 
         lgb_eval = evaluate_multitask(
             rer_true,
@@ -96,6 +92,4 @@ def test_lightgbm_beats_population_curve_baseline(dataset_path: Path) -> None:
     avg_pop = sum(pop_mae) / len(pop_mae)
     # Smoke test only: at n=30 with default LightGBM params, expect any improvement.
     # The meaningful beat (~25%+) shows up at n>=100 — verified separately.
-    assert avg_lgb < avg_pop, (
-        f"LightGBM RER MAE {avg_lgb:.4f} did not beat pop-curve {avg_pop:.4f}"
-    )
+    assert avg_lgb < avg_pop, f"LightGBM RER MAE {avg_lgb:.4f} did not beat pop-curve {avg_pop:.4f}"

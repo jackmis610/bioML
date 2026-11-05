@@ -8,7 +8,7 @@ LT2 - LT1 >= 8 pp floor, and the lognormal MFO prior.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -71,28 +71,23 @@ def sample_subject(spec: dict[str, Any], rng: Generator) -> Subject:
 
     age = int(rng.integers(subj["age"]["bounds"][0], subj["age"]["bounds"][1] + 1))
     sex: Sex = "M" if rng.random() < subj["sex_M_probability"] else "F"
-    training_status: TrainingStatus = _categorical(
-        rng, subj["training_status"]["weights"]
-    )  # type: ignore[assignment]
+    training_status: TrainingStatus = _categorical(rng, subj["training_status"]["weights"])  # type: ignore[assignment]
     habitual_diet: HabitualDiet = _categorical(rng, HABITUAL_DIET_WEIGHTS)  # type: ignore[assignment]
 
     vo2_cfg = subj["vo2max_mlkgmin"]
     vo2_params = stratum_value(vo2_cfg, training_status, sex)
     vo2 = _truncated_normal(rng, vo2_params[0], vo2_params[1], *vo2_cfg["bounds"])
     if age > 25:
-        slope = _truncated_normal(rng, *vo2_cfg["age_decrement_per_year"], 0.05, 1.0)
+        dec_mean, dec_sd = vo2_cfg["age_decrement_per_year"]
+        slope = _truncated_normal(rng, dec_mean, dec_sd, 0.05, 1.0)
         vo2 = max(vo2_cfg["bounds"][0], vo2 - slope * (age - 25))
 
     hrmax_cfg = subj["hrmax_bpm"]
-    hrmax = _truncated_normal(
-        rng, 208 - 0.7 * age, hrmax_cfg["residual_sd"], *hrmax_cfg["bounds"]
-    )
+    hrmax = _truncated_normal(rng, 208 - 0.7 * age, hrmax_cfg["residual_sd"], *hrmax_cfg["bounds"])
 
     hr_rest_cfg = subj["hr_rest_bpm"]
     hr_rest_params = stratum_value(hr_rest_cfg, training_status, sex)
-    hr_rest = _truncated_normal(
-        rng, hr_rest_params[0], hr_rest_params[1], *hr_rest_cfg["bounds"]
-    )
+    hr_rest = _truncated_normal(rng, hr_rest_params[0], hr_rest_params[1], *hr_rest_cfg["bounds"])
 
     th_cfg = subj["thresholds_pct_vo2max"]
     th_strat = th_cfg["by_stratum"][training_status]
@@ -108,9 +103,7 @@ def sample_subject(spec: dict[str, Any], rng: Generator) -> Subject:
     fm_cfg = subj["fatmax_pct_vo2max"]
     fm_params = stratum_value(fm_cfg, training_status, sex)
     fatmax_hi = max(fm_cfg["bounds"][0] + 1, lt1 - 2.0)
-    fatmax = _truncated_normal(
-        rng, fm_params[0], fm_params[1], fm_cfg["bounds"][0], fatmax_hi
-    )
+    fatmax = _truncated_normal(rng, fm_params[0], fm_params[1], fm_cfg["bounds"][0], fatmax_hi)
 
     mfo_cfg = subj["mfo_g_per_min"]
     mfo_strat = mfo_cfg["by_stratum"][training_status]
@@ -133,9 +126,7 @@ def sample_subject(spec: dict[str, Any], rng: Generator) -> Subject:
 
     glyc_cfg = subj["initial_muscle_glycogen_mmol_per_kg"]
     glyc_params = stratum_value(glyc_cfg, training_status)
-    glycogen = _truncated_normal(
-        rng, glyc_params[0], glyc_params[1], *glyc_cfg["bounds"]
-    )
+    glycogen = _truncated_normal(rng, glyc_params[0], glyc_params[1], *glyc_cfg["bounds"])
 
     height = _truncated_normal(rng, 178 if sex == "M" else 165, 7, 150, 200)
     base_weight = 78 if sex == "M" else 64
@@ -143,9 +134,7 @@ def sample_subject(spec: dict[str, Any], rng: Generator) -> Subject:
     bf_mean = 18 if sex == "M" else 26
     if training_status in ("well_trained", "elite"):
         bf_mean -= 5
-    body_fat_pct = _truncated_normal(
-        rng, bf_mean, 4, 6 if sex == "M" else 14, 40
-    )
+    body_fat_pct = _truncated_normal(rng, bf_mean, 4, 6 if sex == "M" else 14, 40)
     ffm = max(25.5, weight * (1 - body_fat_pct / 100))
 
     vo2_estimate = vo2 + _truncated_normal(rng, -1.0, 3.5, -15, 15)
@@ -170,13 +159,11 @@ def sample_subject(spec: dict[str, Any], rng: Generator) -> Subject:
         vo2_tau_moderate_s_true=round(tau, 1),
         initial_muscle_glycogen_mmol_per_kg_true=round(glycogen, 1),
         vo2max_estimated_wearable_mlkgmin=round(vo2_estimate, 2),
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         source="synthetic_v1",
     )
 
 
-def sample_subjects(
-    spec: dict[str, Any], n: int, seed: int = 42
-) -> list[Subject]:
+def sample_subjects(spec: dict[str, Any], n: int, seed: int = 42) -> list[Subject]:
     rng = np.random.default_rng(seed)
     return [sample_subject(spec, rng) for _ in range(n)]

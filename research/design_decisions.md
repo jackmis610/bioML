@@ -1,6 +1,6 @@
 # bioML Generator & Model — Design Decisions
 
-This document records the four load-bearing choices resolved on 2026-05-21 from a focused physiology-first-principles research pass. The detailed evidence is in [physiology_priors.md](physiology_priors.md) and the auxiliary research transcript; this file is the authoritative version of the decisions.
+This document records the four load-bearing choices resolved on 2026-05-21 from a focused physiology-first-principles research pass, plus D5 (2026-11-05), a modeling decision revised by evidence from the evaluation harness. The detailed evidence is in [physiology_priors.md](physiology_priors.md) and the auxiliary research transcript; this file is the authoritative version of the decisions.
 
 ---
 
@@ -109,6 +109,31 @@ Carry log-normal noise σ ≈ 0.12 on both r1 and r2 (Coyle phase-2 CV ≈ 0.62 
 **Why a multitask LT2 head rather than thresholding predicted RER.** Mechanically the flag is mostly `RER_pred ≥ 1.0`, so it sounds redundant. But the auxiliary head (a) gets independent gradient signal from segments where the regression is uncertain, (b) can pick up features that signal the buffering regime *before* RER hits 1.0 (e.g., HR/VO2-estimate mismatch, ventilation-related cadence patterns), and (c) provides a calibrated safety gate at inference that's separately interpretable from RER prediction error.
 
 **Citations.** Frayn 1983 *JAP*; Romijn 1993 *AJP* (explicit Frayn ceiling at RER 1.0); Hawley & Leckey 2015 (substrate-modeling Frayn ceiling guidance); Chenevière 2009 *MSSE* (SIN fat-ox model); PMC9585001 substrate-modeling analysis; PMC11720257 dynamic-prediction wearable-ML pattern; PMC11617143 endurance-athlete ML mini-review.
+
+---
+
+## D5. The VO2 head uses squared error; Huber clipped the gradient and starved the tails
+
+**Decision (2026-11-05).** Train the VO2 booster with the plain L2 objective. Keep Huber (δ = 0.02) on the RER booster.
+
+**What was observed.** With Huber δ = 50 mL/min on VO2 (the v1 setting; the schema doc had said δ = 15), 5-fold subject-wise CV gave VO2 MAE 181 mL/min and an overall bias of −103 mL/min that was invisible in aggregate but stark by intensity bin: +20 mL/min below 30% VO2max, −198 at 65–80%, −402 at 80–90%, −592 at 90–110%. The shape looked like regression toward the mean from noisy inputs where PPG dropout is highest.
+
+**Mechanism.** Huber's gradient is clipped at ±δ. A residual of 600 mL/min pushes the ensemble exactly as hard as one of 50, so with learning rate 0.05 and 400 rounds the extreme predictions cannot travel far enough. The δ was set at the wrong scale for a target whose residuals are hundreds of mL/min.
+
+**Experiment (same folds, VO2 head only):**
+
+| VO2 objective | MAE (mL/min) | bias | bias in 90–110% bin |
+|---|---|---|---|
+| Huber δ = 50 (v1) | 181 | −103 | −592 |
+| Huber δ = 300 | 118 | −10 | −110 |
+| **L2** | **113** | **−5** | **−95** |
+| L2, 63 leaves, min 20/leaf | 112 | −2 | −79 |
+
+The larger-capacity variant buys 1 mL/min; not worth the variance at n = 100.
+
+**The control.** The same experiment on the RER head changed nothing (Huber δ = 0.02: MAE 0.0346; L2: 0.0357; Huber δ = 0.10: 0.0355; per-bin biases within 0.003 of each other). RER residuals are ~0.03, so δ = 0.02 is at scale and does not starve the gradient; the remaining RER tail bias (−0.028 in the top bin) is the latent diet/anchor floor, not the loss. Huber stays, because it is more robust to the per-second breath noise near RER 1.0.
+
+**Lessons that generalise.** Set a robust-loss δ relative to the residual scale you expect, not to the units that feel small. Always report signed bias by bin; aggregate MAE hid a 600 mL/min systematic error. And run the same experiment on the head where you expect no effect, to confirm you have found a mechanism and not a coincidence.
 
 ---
 

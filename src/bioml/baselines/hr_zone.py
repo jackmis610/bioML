@@ -31,7 +31,7 @@ def _zone_index(pct_hrmax: NDArray[np.float64]) -> NDArray[np.int64]:
 class HRZoneBaseline:
     """Stateless predictor: zone -> RER, zone -> VO2, HR threshold -> LT2 flag."""
 
-    def fit(self, features: pl.DataFrame, targets: pl.DataFrame) -> "HRZoneBaseline":
+    def fit(self, features: pl.DataFrame, targets: pl.DataFrame) -> HRZoneBaseline:
         return self
 
     def predict(self, features: pl.DataFrame) -> dict[str, NDArray[np.float64]]:

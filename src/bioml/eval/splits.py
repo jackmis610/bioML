@@ -57,7 +57,7 @@ def physiology_stratified_split(
 
     train: list[str] = []
     test: list[str] = []
-    for stratum, ids in by_stratum.items():
+    for ids in by_stratum.values():
         ids_arr = np.array(ids)
         rng.shuffle(ids_arr)
         n_test = max(1, int(round(len(ids_arr) * test_fraction)))

@@ -11,6 +11,8 @@ index, GPS, temperature drift, battery-save downsampling.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from numpy.random import Generator
 from numpy.typing import NDArray
@@ -112,9 +114,7 @@ def simulate_ppg_hr(
 
     # Dropouts: target steady-state fraction missing per regime, ~30s average burst
     avg_burst = 30.0
-    start_prob_arr = np.array(
-        [dropout_target[_dropout_regime(p)] / avg_burst for p in pct_vo2max]
-    )
+    start_prob_arr = np.array([dropout_target[_dropout_regime(p)] / avg_burst for p in pct_vo2max])
     dropout_mask = np.zeros(n, dtype=bool)
     i = 0
     while i < n:
@@ -129,13 +129,16 @@ def simulate_ppg_hr(
     lock_per_sec = cadence_lock_per_min / 60.0
     j = 0
     while j < n:
-        if not dropout_mask[j] and abs(hr_truth_bpm[j] - cadence_rpm[j]) < 10.0:
-            if rng.random() < lock_per_sec:
-                lock_dur = int(rng.uniform(10, 90))
-                end = min(j + lock_dur, n)
-                smoothed[j:end] = cadence_rpm[j:end] + rng.normal(0.0, 2.0, end - j)
-                j = end
-                continue
+        if (
+            not dropout_mask[j]
+            and abs(hr_truth_bpm[j] - cadence_rpm[j]) < 10.0
+            and rng.random() < lock_per_sec
+        ):
+            lock_dur = int(rng.uniform(10, 90))
+            end = min(j + lock_dur, n)
+            smoothed[j:end] = cadence_rpm[j:end] + rng.normal(0.0, 2.0, end - j)
+            j = end
+            continue
         j += 1
 
     smoothed[dropout_mask] = np.nan
@@ -165,22 +168,25 @@ def simulate_cgm(
         mean_revert = (baseline - samples[i - 1]) * 0.08
         t_window_start = max(0, i * sample_period_s - sample_period_s)
         t_window_end = min(duration_s, (i + 1) * sample_period_s)
-        avg_pct = float(np.mean(pct_vo2max[t_window_start:t_window_end])) if t_window_end > t_window_start else 0.0
+        avg_pct = (
+            float(np.mean(pct_vo2max[t_window_start:t_window_end]))
+            if t_window_end > t_window_start
+            else 0.0
+        )
         exercise_drift = -1.5 if avg_pct > 50 else 0.0
         samples[i] = samples[i - 1] + mean_revert + exercise_drift + float(rng.normal(0, 2.0))
 
     mard_pct = 0.10 if float(np.mean(pct_vo2max > 60)) > 0.3 else 0.08
     samples = samples * (1.0 + rng.normal(0.0, mard_pct / 1.96, n_samples))
 
-    cgm_held = np.repeat(samples, sample_period_s)[:duration_s]
-    return cgm_held
+    return np.repeat(samples, sample_period_s)[:duration_s]
 
 
 def apply_sensor_overlay(
-    truth: dict[str, NDArray],
+    truth: dict[str, NDArray[Any]],
     session: Session,
     rng: Generator,
-) -> dict[str, NDArray]:
+) -> dict[str, NDArray[Any]]:
     """Compute all wearable observation columns from lab-truth time series."""
     pct = truth["pct_vo2max_lab"]
     hr_truth = truth["hr_lab_bpm"]
@@ -190,9 +196,7 @@ def apply_sensor_overlay(
     cadence = simulate_cadence(power_truth, rng)
     hr_w = simulate_ppg_hr(hr_truth, pct, cadence, session.device_model_wearable, rng)
     power_w = simulate_power_meter(power_truth, session.device_model_power, rng)
-    cgm = simulate_cgm(
-        session.diet_state_true, duration_s, pct, session.device_model_cgm, rng
-    )
+    cgm = simulate_cgm(session.diet_state_true, duration_s, pct, session.device_model_cgm, rng)
 
     return {
         "hr_wearable_bpm": hr_w,

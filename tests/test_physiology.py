@@ -16,7 +16,7 @@ from bioml.generator.physiology import (
     run_session,
     steady_state_vo2_mlmin,
 )
-from bioml.generator.sessions import ramp_power_profile, sample_session
+from bioml.generator.sessions import sample_session
 from bioml.generator.subjects import sample_subject, sample_subjects
 
 

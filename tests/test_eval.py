@@ -75,9 +75,7 @@ def test_kfold_rejects_k_too_large() -> None:
 
 def test_stratified_split_includes_all_strata_in_test() -> None:
     ids = [f"s{i:03d}" for i in range(40)]
-    statuses = (
-        ["untrained"] * 10 + ["recreational"] * 15 + ["well_trained"] * 10 + ["elite"] * 5
-    )
+    statuses = ["untrained"] * 10 + ["recreational"] * 15 + ["well_trained"] * 10 + ["elite"] * 5
     train, test = physiology_stratified_split(ids, statuses, test_fraction=0.2, seed=0)
     test_strata = {statuses[ids.index(t)] for t in test}
     assert test_strata == {"untrained", "recreational", "well_trained", "elite"}
@@ -178,9 +176,7 @@ def test_evaluate_multitask_returns_report() -> None:
     lt2_prob = (rer_pred - 0.9) / 0.2
     lt2_prob = np.clip(lt2_prob, 0, 1)
     pct = rng.uniform(0, 100, n)
-    rep = evaluate_multitask(
-        rer_true, rer_pred, vo2_true, vo2_pred, lt2_true, lt2_prob, pct
-    )
+    rep = evaluate_multitask(rer_true, rer_pred, vo2_true, vo2_pred, lt2_true, lt2_prob, pct)
     assert rep.rer_mae > 0
     assert rep.vo2_mae_mlmin > 0
     assert 0.0 <= rep.lt2_auc <= 1.0
