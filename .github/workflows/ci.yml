@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install
+        run: uv sync --extra ml --extra serve --extra dev
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Format
+        run: uv run ruff format --check src tests
+      - name: Type-check
+        run: uv run mypy src
+      - name: Test
+        run: uv run pytest -q
+      - name: Smoke the CLIs end-to-end
+        run: |
+          uv run python -m bioml generate --n-subjects 15 --seed 1 --out /tmp/ds --log-every 0
+          uv run python -m bioml train --data /tmp/ds --k 3 --n-estimators 30 --save-model /tmp/model
+          uv run python -m bioml evaluate --data /tmp/ds --k 3 --n-estimators 30 --out /tmp/report --skip-ablations
+          test -f /tmp/model/metadata.json && test -f /tmp/report/REPORT.md

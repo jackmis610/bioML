@@ -84,7 +84,10 @@ def test_population_curve_beats_hr_zone_on_training_distribution(training_data) 
     rer_true = td.targets["rer_lab"].to_numpy()
     pct_true = (
         td.targets["vo2_lab_mlmin"].to_numpy()
-        / (td.features["vo2max_estimated_wearable_mlkgmin"].to_numpy() * td.features["weight_kg"].to_numpy())
+        / (
+            td.features["vo2max_estimated_wearable_mlkgmin"].to_numpy()
+            * td.features["weight_kg"].to_numpy()
+        )
         * 100
     )
     hz_eval = evaluate_multitask(
@@ -106,5 +109,6 @@ def test_population_curve_beats_hr_zone_on_training_distribution(training_data) 
         pct_true,
     )
     assert pop_eval.rer_mae < hz_eval.rer_mae, (
-        f"population curve RER MAE {pop_eval.rer_mae:.4f} did not beat HR-zone {hz_eval.rer_mae:.4f}"
+        f"population curve RER MAE {pop_eval.rer_mae:.4f} "
+        f"did not beat HR-zone {hz_eval.rer_mae:.4f}"
     )

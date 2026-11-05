@@ -31,15 +31,11 @@ def test_all_subjects_pass_schema_validation(spec: dict) -> None:
 
 
 def test_lt2_always_above_lt1_with_min_gap(big_cohort: list) -> None:
-    gaps = np.array(
-        [s.lt2_pct_vo2max_true - s.lt1_pct_vo2max_true for s in big_cohort]
-    )
+    gaps = np.array([s.lt2_pct_vo2max_true - s.lt1_pct_vo2max_true for s in big_cohort])
     assert (gaps >= 8.0).all()
 
 
-def test_training_status_proportions_match_weights(
-    spec: dict, big_cohort: list
-) -> None:
+def test_training_status_proportions_match_weights(spec: dict, big_cohort: list) -> None:
     target = spec["subject"]["training_status"]["weights"]
     counts = Counter(s.training_status for s in big_cohort)
     for stratum, target_p in target.items():
@@ -111,9 +107,7 @@ def test_mfo_lognormal_has_right_skew(big_cohort: list) -> None:
 
 def test_keto_subjects_have_higher_mfo(big_cohort: list) -> None:
     keto = np.array([s.mfo_g_per_min_true for s in big_cohort if s.habitual_diet == "keto"])
-    mixed = np.array(
-        [s.mfo_g_per_min_true for s in big_cohort if s.habitual_diet == "mixed"]
-    )
+    mixed = np.array([s.mfo_g_per_min_true for s in big_cohort if s.habitual_diet == "mixed"])
     if len(keto) >= 30 and len(mixed) >= 100:
         assert float(np.mean(keto)) > float(np.mean(mixed))
 

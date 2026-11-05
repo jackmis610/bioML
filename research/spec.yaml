@@ -240,6 +240,7 @@ output_strategy:
   losses:
     rer: huber
     huber_delta: 0.02
+    vo2: l2                            # D5 (2026-11-05): Huber at delta 15-50 mL/min clipped gradients
     flag: binary_cross_entropy
     flag_positive_class_weight: 4.0
 

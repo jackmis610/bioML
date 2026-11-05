@@ -75,7 +75,10 @@ def test_above_lt2_flag_aligns_with_rer(small_dataset: Path) -> None:
     sessions_df = pl.read_parquet(small_dataset / "sessions.parquet")
     first = sessions_df.row(0, named=True)
     samples = pl.read_parquet(
-        small_dataset / "samples" / f"subject_id={first['subject_id']}" / f"{first['session_id']}.parquet"
+        small_dataset
+        / "samples"
+        / f"subject_id={first['subject_id']}"
+        / f"{first['session_id']}.parquet"
     )
     high_rer = samples.filter(pl.col("rer_lab") >= 1.0)
     if high_rer.height > 0:
@@ -86,7 +89,10 @@ def test_frayn_columns_nan_above_lt2(small_dataset: Path) -> None:
     sessions_df = pl.read_parquet(small_dataset / "sessions.parquet")
     first = sessions_df.row(0, named=True)
     samples = pl.read_parquet(
-        small_dataset / "samples" / f"subject_id={first['subject_id']}" / f"{first['session_id']}.parquet"
+        small_dataset
+        / "samples"
+        / f"subject_id={first['subject_id']}"
+        / f"{first['session_id']}.parquet"
     )
     above = samples.filter(pl.col("above_lt2_flag"))
     if above.height > 0:

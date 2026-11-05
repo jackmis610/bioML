@@ -16,7 +16,7 @@ from numpy.random import Generator
 from numpy.typing import NDArray
 
 from bioml.frayn import cho_oxidation_g_per_min, fat_oxidation_g_per_min
-from bioml.generator.sessions import KCAL_TO_ML_O2_AT_WATT, VO2_REST_ML_PER_KG_MIN
+from bioml.generator.sessions import VO2_REST_ML_PER_KG_MIN
 from bioml.schemas import Session, Subject
 
 DIET_OFFSETS = {
@@ -81,7 +81,7 @@ def glycogen_depletion_rate_mmol_per_kg_per_min(
     if pct_vo2max < 40.0:
         return 0.0
     pct = min(pct_vo2max, 90.0)
-    r = r1_at_65 * (pct / 65.0) ** 1.8
+    r = float(r1_at_65 * (pct / 65.0) ** 1.8)
     if glycogen_current < knee_fraction * glycogen_initial:
         r *= phase2_multiplier
     return r
@@ -93,7 +93,7 @@ def run_session(
     power_profile_w: NDArray[np.float64],
     spec: dict[str, Any],
     rng: Generator,
-) -> dict[str, NDArray]:
+) -> dict[str, NDArray[Any]]:
     """Simulate one full session. Returns per-second arrays keyed by Sample column name."""
     n = len(power_profile_w)
     weight = subject.weight_kg
@@ -195,13 +195,9 @@ def run_session(
         if not above and 0.71 <= r_total <= 1.0:
             vo2_l = vo2_current / 1000.0
             vco2_l = vco2_t / 1000.0
-            fat_ox_arr[t] = float(
-                fat_oxidation_g_per_min(np.array([vo2_l]), np.array([vco2_l]))[0]
-            )
+            fat_ox_arr[t] = float(fat_oxidation_g_per_min(np.array([vo2_l]), np.array([vco2_l]))[0])
             cho_ox_arr[t] = float(
-                cho_oxidation_g_per_min(
-                    np.array([vo2_l]), np.array([vco2_l]), regime="exercise"
-                )[0]
+                cho_oxidation_g_per_min(np.array([vo2_l]), np.array([vco2_l]), regime="exercise")[0]
             )
 
         depletion = glycogen_depletion_rate_mmol_per_kg_per_min(

@@ -20,7 +20,7 @@ data/aevox/
 data/public/
 !data/.gitkeep
 
-# Models / experiments
+# Models / experiments (regenerable: `make train`)
 mlruns/
 models/
 *.ckpt
@@ -34,6 +34,8 @@ models/
 
 # Pytest / coverage
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
@@ -42,3 +44,6 @@ htmlcov/
 
 # Env
 .env
+
+# Local tooling
+.claude/

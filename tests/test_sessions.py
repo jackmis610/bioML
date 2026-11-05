@@ -7,7 +7,6 @@ import pytest
 
 from bioml.config import load_spec
 from bioml.generator.sessions import (
-    KCAL_TO_ML_O2_AT_WATT,
     VO2_REST_ML_PER_KG_MIN,
     power_at_vo2max,
     ramp_power_profile,
@@ -67,9 +66,7 @@ def test_ramp_duration_within_cpet_bounds(subjects: list) -> None:
     for s in subjects:
         profile = ramp_power_profile(s, rng)
         ramp_only = len(profile) - 360
-        assert 180 <= ramp_only <= 1200, (
-            f"{s.training_status} ramp {ramp_only}s out of bounds"
-        )
+        assert 180 <= ramp_only <= 1200, f"{s.training_status} ramp {ramp_only}s out of bounds"
 
 
 def test_sample_session_returns_valid_session_and_aligned_power(subjects: list) -> None:

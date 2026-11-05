@@ -7,7 +7,8 @@ will raise NotImplementedError until added.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -15,7 +16,7 @@ from numpy.random import Generator
 
 from bioml.schemas import DietState, HabitualDiet, Session, Subject
 
-DIET_STATE_BY_HABITUAL: dict[HabitualDiet, dict[DietState, float]] = {
+DIET_STATE_BY_HABITUAL: dict[HabitualDiet, dict[str, float]] = {
     "keto": {"keto_adapted": 1.0},
     "mixed": {"fasted": 0.55, "fed_carb_2_3h": 0.45},
     "high_carb": {"fasted": 0.20, "fed_carb_2_3h": 0.80},
@@ -47,7 +48,7 @@ def _categorical(rng: Generator, choices: tuple[Any, ...]) -> Any:
     return choices[int(rng.integers(0, len(choices)))]
 
 
-def _categorical_weighted(rng: Generator, weights: dict[str, float]) -> str:
+def _categorical_weighted(rng: Generator, weights: Mapping[str, float]) -> str:
     keys = list(weights.keys())
     probs = np.array(list(weights.values()), dtype=np.float64)
     probs = probs / probs.sum()
@@ -134,6 +135,6 @@ def sample_session(
         device_model_wearable=_categorical(rng, WEARABLE_DEVICES),
         device_model_power=_categorical(rng, POWER_DEVICES),
         device_model_cgm=_categorical(rng, CGM_DEVICES),
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     return session, power

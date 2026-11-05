@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -14,7 +14,7 @@ DEFAULT_SPEC_PATH = REPO_ROOT / "research" / "spec.yaml"
 def load_spec(path: Path | str | None = None) -> dict[str, Any]:
     p = Path(path) if path is not None else DEFAULT_SPEC_PATH
     with p.open("r") as f:
-        return yaml.safe_load(f)
+        return cast(dict[str, Any], yaml.safe_load(f))
 
 
 def stratum_value(

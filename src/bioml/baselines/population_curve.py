@@ -37,7 +37,7 @@ class PopulationCurveBaseline:
     def _bin_centers(self) -> NDArray[np.float64]:
         return 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:])
 
-    def fit(self, features: pl.DataFrame, targets: pl.DataFrame) -> "PopulationCurveBaseline":
+    def fit(self, features: pl.DataFrame, targets: pl.DataFrame) -> PopulationCurveBaseline:
         pct = _pct_hrmax(features)
         rer = targets["rer_lab"].to_numpy().astype(np.float64)
         vo2 = targets["vo2_lab_mlmin"].to_numpy().astype(np.float64)
@@ -48,9 +48,7 @@ class PopulationCurveBaseline:
         vo2_frac = (vo2 - vo2_rest_abs) / np.maximum(vo2max_abs - vo2_rest_abs, 1.0)
         lt2 = targets["above_lt2_flag"].to_numpy().astype(np.float64)
 
-        idx = np.clip(
-            np.searchsorted(self.bin_edges[1:-1], pct, side="right"), 0, self.n_bins - 1
-        )
+        idx = np.clip(np.searchsorted(self.bin_edges[1:-1], pct, side="right"), 0, self.n_bins - 1)
         rer_curve = np.full(self.n_bins, np.nan)
         vo2_curve = np.full(self.n_bins, np.nan)
         lt2_curve = np.full(self.n_bins, np.nan)
@@ -65,7 +63,9 @@ class PopulationCurveBaseline:
             mask_valid = ~np.isnan(arr)
             if mask_valid.any():
                 centers = self._bin_centers()
-                arr[~mask_valid] = np.interp(centers[~mask_valid], centers[mask_valid], arr[mask_valid])
+                arr[~mask_valid] = np.interp(
+                    centers[~mask_valid], centers[mask_valid], arr[mask_valid]
+                )
 
         self.rer_curve = rer_curve
         self.vo2_frac_curve = vo2_curve

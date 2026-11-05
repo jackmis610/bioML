@@ -170,7 +170,7 @@ Per session/subject (broadcast to every row):
 
 ### Targets (multitask)
 
-- **Primary regression:** `vo2_lab_mlmin` (absolute VO2 in mL/min) — Huber loss δ=15 mL/min
+- **Primary regression:** `vo2_lab_mlmin` (absolute VO2 in mL/min) — squared-error loss (revised 2026-11-05, decision D5: Huber at any δ in the tens of mL/min clipped gradients and under-predicted the top intensity bins)
 - **Primary regression:** `rer_lab` — Huber loss δ=0.02
 - **Auxiliary classification:** `above_lt2_flag` — BCE with positive-class weight ≈ 4
 
